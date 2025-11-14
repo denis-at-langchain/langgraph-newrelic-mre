@@ -1,9 +1,23 @@
 {
-  "dependencies": ["."],
+  "dependencies": ["./newrelic.ini"],
   "graphs": {
     "agent": "./agent.py:graph"
   },
   "env": ".env",
-  "python_version": "3.11"
+  "python_version": "3.11",
+  "dockerfile_lines": [
+    "ENV NEW_RELIC_CONFIG_FILE=/deps/newrelic.ini",
+    "ENV NEW_RELIC_ENVIRONMENT=production"
+  ],
+  "http": {
+    "disable_studio_auth": true,
+    "allow_origins": "*",
+    "allow_methods": "*",
+    "allow_headers": "*",
+    "configurable_headers": {
+      "exclude": ["*"],
+      "include": ["authorization"]
+    }
+  }
 }
 

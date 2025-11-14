@@ -13,51 +13,16 @@ import sys
 import asyncio
 
 # ============================================================================
-# NEW RELIC INITIALIZATION - This is where the issue occurs
+# NEW RELIC - Using environment variable configuration only
 # ============================================================================
-
-print("=" * 80)
-print("🔧 Attempting New Relic initialization...")
-print("=" * 80)
-
-try:
-    import newrelic.agent
-    
-    # Method 1: Try to initialize from newrelic.ini file
-    config_file = None
-    possible_locations = [
-        "./newrelic.ini",
-        "../newrelic.ini",
-        "newrelic.ini",
-        os.path.join(os.getcwd(), "newrelic.ini")
-    ]
-    
-    for location in possible_locations:
-        if os.path.exists(location):
-            config_file = location
-            print(f"📄 Found New Relic config at: {config_file}")
-            break
-    
-    if config_file:
-        newrelic.agent.initialize(config_file)
-        print(f"✅ New Relic agent initialized with config: {config_file}")
-    else:
-        # Method 2: Initialize with environment variables only
-        newrelic.agent.initialize()
-        print("✅ New Relic agent initialized with environment variables")
-        
-    print(f"📊 New Relic App Name: {os.environ.get('NEW_RELIC_APP_NAME', 'Not Set')}")
-    print(f"🔑 New Relic License Key: {'Set' if os.environ.get('NEW_RELIC_LICENSE_KEY') else 'Not Set'}")
-    
-except ImportError as e:
-    print(f"⚠️ New Relic not available: {e}")
-except Exception as e:
-    print(f"❌ Error initializing New Relic: {e}")
-    print(f"   Error type: {type(e).__name__}")
-    import traceback
-    traceback.print_exc()
-
-print("=" * 80)
+# Note: For LangGraph Platform deployment, New Relic initialization happens
+# via environment variables set in LangSmith deployment settings:
+#   NEW_RELIC_CONFIG_FILE=/deps/newrelic.ini
+#   NEW_RELIC_ENVIRONMENT=production
+#   NEW_RELIC_LICENSE_KEY=<your-key>
+#   NEW_RELIC_APP_NAME=<your-app-name>
+# This avoids conflicts with LangGraph's Uvicorn initialization.
+# ============================================================================
 
 # ============================================================================
 # LANGGRAPH AGENT - Minimal Example
