@@ -44,10 +44,6 @@ Thumbs.db
 # Logs
 *.log
 
-# New Relic
-newrelic.ini
-!newrelic-minimal.ini
-
 # Secrets
 *.key
 *.pem
