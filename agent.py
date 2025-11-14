@@ -10,6 +10,7 @@ conflicts with New Relic's automatic instrumentation hooks.
 
 import os
 import sys
+import asyncio
 
 # ============================================================================
 # NEW RELIC INITIALIZATION - This is where the issue occurs
@@ -104,14 +105,15 @@ graph_builder.add_node("chatbot", chatbot)
 graph_builder.add_edge(START, "chatbot")
 graph_builder.add_edge("chatbot", END)
 
-# Compile the graph
-graph = graph_builder.compile()
+# Compile the graph in a thread using async
+async def compile_graph():
+    def _compile():
+        return graph_builder.compile()
+    return await asyncio.to_thread(_compile)
 
 print("✅ LangGraph compiled successfully")
 print("=" * 80)
 print("🚀 Ready to deploy!")
 print("=" * 80)
 
-# This is what LangSmith/LangGraph Platform will import
-__all__ = ["graph"]
 
