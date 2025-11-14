@@ -111,9 +111,13 @@ async def compile_graph():
         return graph_builder.compile()
     return await asyncio.to_thread(_compile)
 
+graph = asyncio.run(compile_graph())
+
 print("✅ LangGraph compiled successfully")
 print("=" * 80)
 print("🚀 Ready to deploy!")
 print("=" * 80)
 
+# This is what LangSmith/LangGraph Platform will import
+__all__ = ["graph"]
 
