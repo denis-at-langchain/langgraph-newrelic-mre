@@ -6,6 +6,8 @@ and New Relic's automatic instrumentation hooks.
 
 Problem: LangGraph Platform controls how Uvicorn is initialized, causing direct
 conflicts with New Relic's automatic instrumentation hooks.
+
+Solution: Explicitly initialize New Relic agent before importing LangGraph.
 """
 
 import os
@@ -13,15 +15,17 @@ import sys
 import asyncio
 
 # ============================================================================
-# NEW RELIC - Using environment variable configuration only
+# NEW RELIC - EXPLICIT INITIALIZATION (MUST BE FIRST)
 # ============================================================================
-# Note: For LangGraph Platform deployment, New Relic initialization happens
-# via environment variables set in LangSmith deployment settings:
-#   NEW_RELIC_CONFIG_FILE=/deps/newrelic.ini
-#   NEW_RELIC_ENVIRONMENT=production
-#   NEW_RELIC_LICENSE_KEY=<your-key>
-#   NEW_RELIC_APP_NAME=<your-app-name>
-# This avoids conflicts with LangGraph's Uvicorn initialization.
+# Initialize New Relic agent before any other imports
+# This ensures the agent is active regardless of environment variable timing
+config_file = os.environ.get("NEW_RELIC_CONFIG_FILE", "/deps/newrelic.ini")
+if os.path.exists(config_file):
+    import newrelic.agent
+    newrelic.agent.initialize(config_file)
+    print(f"✅ New Relic agent initialized from {config_file}")
+else:
+    print(f"⚠️ New Relic config not found at {config_file} - running without APM")
 # ============================================================================
 
 # ============================================================================
