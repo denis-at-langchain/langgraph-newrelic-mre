@@ -4,7 +4,7 @@
 FROM langchain/langgraph-api:3.11
 
 # Add requirements
-ADD requirements-minimal.txt /deps/requirements.txt
+ADD requirements.txt /deps/requirements.txt
 RUN PYTHONDONTWRITEBYTECODE=1 pip install --no-cache-dir -r /deps/requirements.txt
 
 # Add agent code
