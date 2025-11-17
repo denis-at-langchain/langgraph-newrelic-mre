@@ -1,11 +1,10 @@
 """
-Minimal Reproducible Example: LangGraph + New Relic Integration Issue
+Minimal Reproducible Example: LangGraph + New Relic Integration
 
-This demonstrates the conflict between LangGraph Platform's ASGI server lifecycle
-and New Relic's automatic instrumentation hooks.
+This demonstrates a simple LangGraph agent with optional New Relic monitoring.
 
-Solution: Initialize New Relic with disable_agent_hooks to prevent conflicts
-with LangGraph Platform's Uvicorn initialization.
+Note: New Relic is initialized via environment variables set in deployment settings.
+No direct initialization needed - the agent is activated automatically.
 """
 
 import os
@@ -13,18 +12,15 @@ import sys
 import asyncio
 
 # ============================================================================
-# NEW RELIC - EXPLICIT INITIALIZATION WITH HOOK DISABLE
+# NEW RELIC - Environment Variable Configuration
 # ============================================================================
-# Initialize New Relic agent before any other imports
-# Use disable_agent_hooks to prevent conflicts with LangGraph's Uvicorn
-config_file = os.environ.get("NEW_RELIC_CONFIG_FILE", "/deps/newrelic.ini")
-if os.path.exists(config_file):
-    import newrelic.agent
-    # Disable automatic hooks to prevent Uvicorn conflict
-    newrelic.agent.initialize(config_file, disable_agent_hooks=True)
-    print(f"✅ New Relic agent initialized from {config_file}")
-else:
-    print(f"⚠️ New Relic config not found at {config_file} - running without APM")
+# New Relic initializes automatically from environment variables:
+#   NEW_RELIC_LICENSE_KEY - Required for activation
+#   NEW_RELIC_CONFIG_FILE - Path to config file
+#   NEW_RELIC_ENVIRONMENT - Deployment environment
+#
+# No manual initialization is performed to avoid conflicts with LangGraph Platform's
+# Uvicorn server management. The agent auto-initializes when these env vars are set.
 # ============================================================================
 
 # ============================================================================

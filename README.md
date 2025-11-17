@@ -83,29 +83,22 @@ In the LangSmith deployment settings, add the following **Secrets**:
 
 ```
 OPENAI_API_KEY = <your-openai-api-key>
-```
-
-**For New Relic Monitoring (Required for APM)**
-
-```
 NEW_RELIC_LICENSE_KEY = <your-new-relic-license-key>
 ```
+
+The `NEW_RELIC_LICENSE_KEY` is required to activate New Relic monitoring.
 
 ### Step 4: Configure Environment Variables
 
 In the deployment settings, set **Environment Variables**:
 
 ```
-NEW_RELIC_CONFIG_FILE=/deps/newrelic.ini
 NEW_RELIC_ENVIRONMENT=production
 ```
 
-**How New Relic Initialization Works:**
+**How New Relic Activation Works:**
 
-The `agent.py` file explicitly initializes the New Relic agent at import time, before LangGraph loads. This ensures:
-- New Relic instrumentation is active from startup
-- No conflicts with LangGraph Platform's ASGI server lifecycle
-- Automatic tracking of all transactions and LLM calls
+New Relic initializes automatically when the `NEW_RELIC_LICENSE_KEY` environment variable is set. This happens during the Uvicorn server startup, before LangGraph Platform initializes. The config file at `/deps/newrelic.ini` controls the monitoring settings (transaction tracking, AI monitoring, error collection, etc.).
 
 ### Step 5: Deploy
 
@@ -166,15 +159,15 @@ LangGraph Platform builds and deploys using this image:
 - View logs in LangSmith deployment details
 
 ### New Relic not receiving data
-- Verify `NEW_RELIC_LICENSE_KEY` is set in secrets
-- Check `NEW_RELIC_CONFIG_FILE=/deps/newrelic.ini` is in environment variables
-- Ensure `disable_agent_hooks = true` in `newrelic.ini` (prevents Uvicorn conflict)
+- Verify `NEW_RELIC_LICENSE_KEY` is set in LangSmith secrets
+- Check that `newrelic` package is installed (in `requirements.txt`)
+- Ensure `NEW_RELIC_CONFIG_FILE=/deps/newrelic.ini` (set in Dockerfile)
 - View New Relic agent logs in deployment logs
 
-### AttributeError: 'Config' object has no attribute '_nr_loaded_app'
-- This error occurs when New Relic's automatic hooks conflict with LangGraph's Uvicorn
-- **Fix**: Ensure `disable_agent_hooks = true` is set in `newrelic.ini`
-- The agent is manually initialized in `agent.py` with `disable_agent_hooks=True`
+### TypeError: initialize() got an unexpected keyword argument
+- This indicates you manually initialized New Relic with invalid parameters
+- **Fix**: Remove any manual `newrelic.agent.initialize()` calls from code
+- New Relic activates automatically from environment variables - no manual init needed
 
 ## Support
 

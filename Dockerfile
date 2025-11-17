@@ -14,14 +14,10 @@ ADD newrelic.ini /deps/newrelic.ini
 # Set working directory
 WORKDIR /deps
 
-# Set New Relic environment variables
-ENV NEW_RELIC_APP_NAME=langgraph-newrelic-mre
-ENV NEW_RELIC_LOG_LEVEL=info
+# Set New Relic environment variables for the config file location
+# License key MUST be set via LangSmith deployment secrets
 ENV NEW_RELIC_CONFIG_FILE=/deps/newrelic.ini
 
-# Ensure New Relic config file is readable
-RUN chmod 644 /deps/newrelic.ini
-
-# Note: NEW_RELIC_LICENSE_KEY should be set via LangSmith secrets
+# Note: NEW_RELIC_LICENSE_KEY must be set via LangSmith secrets for activation
 # Note: NEW_RELIC_ENVIRONMENT can be set via LangSmith deployment settings
 
