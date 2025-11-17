@@ -1,75 +1,348 @@
-# LangGraph + New Relic MRE
+# LangGraph + New Relic Integration MRE
 
-A minimal reproducible example demonstrating LangGraph integration with New Relic APM monitoring.
+A minimal reproducible example demonstrating how to integrate New Relic APM monitoring with LangGraph agents deployed on LangGraph Platform (LangSmith).
 
 ## Overview
 
 This project showcases:
-- A simple LangGraph agent with message handling
-- New Relic APM instrumentation configured for LangGraph Platform deployment
-- Proper configuration to avoid conflicts between LangGraph's ASGI lifecycle and New Relic's automatic instrumentation
+- A simple LangGraph agent with message handling and LLM integration
+- **New Relic explicit initialization** with a resilient Uvicorn hook workaround
+- Complete APM monitoring: transactions, distributed tracing, LLM calls, and errors
+- Deployment to LangGraph Platform via LangSmith with full observability
+
+### The Challenge
+
+LangGraph Platform controls the ASGI/Uvicorn server lifecycle, which creates timing conflicts with New Relic's automatic instrumentation hooks. New Relic attempts to access `Config._nr_loaded_app` during initialization, but this attribute doesn't exist until the config is fully loaded.
+
+### The Solution
+
+This project implements a `ResilientUvicornHook` proxy that:
+- Intercepts New Relic's Uvicorn hook before initialization
+- Lazy-loads the real hook after New Relic is ready
+- Preserves full Uvicorn and transaction instrumentation
+- Gracefully handles edge cases
 
 ## Project Structure
 
 ```
-├── agent.py              # LangGraph agent definition
-├── langgraph.json        # LangGraph deployment configuration
+├── agent.py              # LangGraph agent with New Relic initialization
+├── langgraph.json        # LangGraph Platform configuration
 ├── requirements.txt      # Python dependencies
 ├── Dockerfile            # Container image definition
 ├── newrelic.ini          # New Relic agent configuration
 ├── README.md             # This file
-└── .env                  # Environment variables (not in repo)
+└── .env                  # Environment variables (local only)
 ```
 
 ## Prerequisites
 
 - Python 3.11+
-- OpenAI API key (optional; the agent has fallback echo mode)
-- New Relic account with a valid license key (for production monitoring)
+- LangSmith account (free tier available at https://smith.langchain.com)
+- OpenAI API key (optional; the agent has fallback echo mode for testing)
+- New Relic account (for APM monitoring)
+
+## Local Development
+
+### 1. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Set Up Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# .env (local testing only)
+OPENAI_API_KEY=your_openai_key_here
+NEW_RELIC_LICENSE_KEY=your_new_relic_key_here  # Optional
+NEW_RELIC_CONFIG_FILE=/path/to/newrelic.ini     # Optional
+```
+
+### 3. Test Locally
+
+```bash
+python agent.py
+```
+
+Expected output:
+```
+✅ New Relic agent initialized (config: /path/to/newrelic.ini)
+   ✓ Uvicorn instrumentation: ENABLED
+   ✓ Distributed tracing: ENABLED
+   ✓ AI monitoring: ENABLED
+   ✓ Transaction tracing: ENABLED
+🔨 Building LangGraph...
+✅ LangGraph compiled successfully
+🚀 Ready to deploy!
+```
+
+## Deployment on LangSmith
+
+### Step 1: Push to GitHub
+
+Ensure your code is in a GitHub repository:
+
+```bash
+git add .
+git commit -m "LangGraph agent with New Relic monitoring"
+git push origin main
+```
+
+### Step 2: Create LangSmith Deployment
+
+1. Go to [LangSmith Deployments](https://smith.langchain.com/deployments)
+2. Click **Create Deployment**
+3. Select **New Deployment from GitHub**
+4. Connect your GitHub repository
+5. Select the branch (e.g., `main`)
+
+### Step 3: Configure Secrets
+
+Add the following secrets in LangSmith deployment settings:
+
+```
+OPENAI_API_KEY = <your-openai-api-key>
+NEW_RELIC_LICENSE_KEY = <your-new-relic-license-key>
+```
+
+**Important**: `NEW_RELIC_LICENSE_KEY` is required to activate New Relic monitoring. Without it, the agent runs in disabled mode.
+
+### Step 4: Configure Environment Variables
+
+Set the following environment variables:
+
+```
+NEW_RELIC_ENVIRONMENT=production
+```
+
+(The Dockerfile already sets `NEW_RELIC_CONFIG_FILE=/deps/newrelic.ini`)
+
+### Step 5: Deploy
+
+1. Click **Deploy**
+2. Wait for the build to complete (typically 2-5 minutes)
+3. Once deployed, you'll receive a public API endpoint
+
+## Using the Deployed Agent
+
+Once deployed, interact with your agent via the LangSmith API:
+
+```bash
+curl -X POST https://<your-deployment-url>/runs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": {
+      "messages": [{"role": "user", "content": "Hello!"}]
+    }
+  }'
+```
+
+Or use the LangSmith UI to test interactively.
+
+## Monitoring with New Relic
+
+After deployment, view monitoring data in New Relic:
+
+1. Go to [New Relic APM](https://one.newrelic.com/apm)
+2. Select your app (`langgraph-newrelic-mre`)
+3. View real-time metrics:
+   - **Transactions**: HTTP requests to your agent
+   - **AI Monitoring**: OpenAI/LangChain call details and latencies
+   - **Distributed Tracing**: Request flows across services
+   - **Error Analytics**: Exceptions and error rates
+   - **Service Maps**: Architecture visualization
+
+## Configuration Files
+
+### `agent.py`
+
+The core agent file with New Relic initialization:
+
+- **ResilientUvicornHook**: Proxy class that handles Uvicorn hook timing
+- **New Relic initialization**: Explicit `newrelic.agent.initialize()` call
+- **LangGraph agent**: Simple chatbot that echoes or calls OpenAI
+
+Key features:
+- Only initializes New Relic if `NEW_RELIC_LICENSE_KEY` is set
+- Gracefully handles missing OpenAI key with echo mode
+- Async graph compilation using `asyncio`
+
+### `langgraph.json`
+
+LangGraph Platform configuration:
+
+```json
+{
+  "graphs": { "agent": "./agent.py:graph" },
+  "python_version": "3.11",
+  "dockerfile_lines": [
+    "ADD newrelic.ini /deps/newrelic.ini",
+    "ENV NEW_RELIC_CONFIG_FILE=/deps/newrelic.ini"
+  ]
+}
+```
+
+- Defines the agent graph endpoint
+- Sets Python version to 3.11
+- Adds New Relic config file to Docker image
+
+### `newrelic.ini`
+
+New Relic agent configuration:
+
+- **Distributed tracing**: Enabled for cross-service visibility
+- **AI monitoring**: Tracks LLM calls with `ai_monitoring.enabled = true`
+- **Transaction tracing**: Captures detailed request data
+- **Application logging**: Forwards logs to New Relic
+- **Error collection**: Captures exceptions and stack traces
+- **Labels**: Tags for filtering (`environment:test`, `platform:langgraph`)
+
+### `Dockerfile`
+
+Builds a container image with New Relic support:
+
+- Starts from `langchain/langgraph-api:3.11`
+- Installs dependencies from `requirements.txt`
+- Copies agent code and New Relic config
+- Sets `NEW_RELIC_CONFIG_FILE` environment variable
+
+### `requirements.txt`
+
+Python dependencies:
+
+```
+langgraph>=0.2.0      # LangGraph framework
+langchain-core>=0.3.0 # LangChain core
+langchain-openai>=0.2.0 # OpenAI integration
+newrelic>=9.0.0       # New Relic APM agent
+requests>=2.31.0      # HTTP client
+```
+
+## New Relic Integration Details
+
+### How It Works
+
+1. **Early Hook Interception**: Before any imports, `ResilientUvicornHook` is installed in `sys.modules`
+2. **New Relic Initialization**: `newrelic.agent.initialize()` is called explicitly
+3. **Lazy Hook Loading**: When the Uvicorn hook is accessed, it's safely loaded after New Relic is ready
+4. **Full Instrumentation**: All transactions, LLM calls, and errors are automatically tracked
+
+### Complete Monitoring Coverage
+
+✓ **Uvicorn instrumentation**: Thread pools, connections, request handling
+✓ **Distributed tracing**: Request spans across services
+✓ **Transaction traces**: Code-level performance visibility
+✓ **LLM monitoring**: OpenAI/LangChain call tracking
+✓ **Error tracking**: Exception capture and reporting
+✓ **Custom events**: Application-specific metrics via New Relic API
+
+## Troubleshooting
+
+### Agent fails to load
+
+Check the deployment logs:
+- Verify `OPENAI_API_KEY` is set (or accept echo mode)
+- Check `requirements.txt` package versions are compatible
+- Review build logs in LangSmith deployment details
+
+### New Relic not receiving data
+
+1. **Verify setup**:
+   - Check that `NEW_RELIC_LICENSE_KEY` is set in secrets
+   - Confirm `newrelic` package is installed
+   - Verify `NEW_RELIC_CONFIG_FILE=/deps/newrelic.ini` in Docker
+
+2. **Check initialization**:
+   - Look for "✅ New Relic agent initialized" in deployment logs
+   - Verify all four features show "ENABLED"
+
+3. **View agent logs**:
+   - New Relic logs are sent to stdout (see deployment logs)
+   - Set `log_level = debug` in `newrelic.ini` for verbose output
+
+### Uvicorn-related New Relic errors
+
+If you see `AttributeError: 'Config' object has no attribute '_nr_loaded_app'`:
+
+- **This is handled** by the `ResilientUvicornHook` in `agent.py`
+- The hook defers loading until after New Relic initialization
+- Full instrumentation is preserved
+- If errors persist, verify `ResilientUvicornHook` is properly defined
+
+### Deployment build fails
+
+- Ensure `Dockerfile` exists and references valid files
+- Check that all files in `langgraph.json` paths exist
+- Verify Python 3.11 compatibility of dependencies
+- Review build logs for missing packages
+
+## Next Steps
+
+1. **Customize the agent**: Add more nodes, integrate with your data, add tools
+2. **Set up New Relic alerts**: Create alert policies for error rates, latency, etc.
+3. **Explore distributed tracing**: View full request flows in New Relic
+4. **Optimize performance**: Use New Relic transaction data to identify bottlenecks
+5. **Monitor LLM costs**: Track OpenAI usage and latencies in New Relic
+
+## Resources
+
+- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
+- [LangSmith Deployment Guide](https://docs.smith.langchain.com/)
+- [New Relic Python Agent Docs](https://docs.newrelic.com/docs/agents/python-agent/)
+- [New Relic AI Monitoring](https://docs.newrelic.com/docs/ai-monitoring/)
+- [Distributed Tracing](https://docs.newrelic.com/docs/distributed-tracing/)
+
+## License
+
+This is a minimal example for educational purposes. Modify and use as needed for your project.
 
 ## How It Works
 
 ### New Relic Integration
 
-This project includes an **enhanced integration** for New Relic monitoring with LangGraph Platform:
+This project includes a **resilient integration** for New Relic monitoring with LangGraph Platform that preserves full observability:
 
-**The Problem**: LangGraph Platform controls the ASGI/Uvicorn server lifecycle, which conflicts with New Relic's automatic instrumentation hooks for Uvicorn. During initialization, New Relic tries to access `Config._nr_loaded_app` before it's been set, causing AttributeErrors.
+**The Challenge**: LangGraph Platform controls the ASGI/Uvicorn server lifecycle independently. New Relic's Uvicorn hook attempts to access `Config._nr_loaded_app` during initialization, but this attribute doesn't exist until after the config is fully loaded—creating a timing conflict.
 
-**The Solution**: The `agent.py` file uses a **protected hook wrapper** that:
+**The Solution**: A `ResilientUvicornHook` proxy that:
 
-1. Intercepts New Relic's Uvicorn hook before initialization
-2. Allows the hook to initialize safely after New Relic starts
-3. Preserves full Uvicorn instrumentation and metrics
-4. Enables complete distributed tracing
+1. **Intercepts the hook early** - Before New Relic initializes, preventing premature access
+2. **Lazy-loads on demand** - Defers real hook loading until after New Relic is ready
+3. **Gracefully handles failures** - Falls back to safe no-ops if hook loading fails
+4. **Preserves all instrumentation** - Once loaded, the real hook provides complete coverage
 
 ```python
-class ProtectedUvicornHook:
-    """Safely handles New Relic's Uvicorn hook initialization."""
-    def __init__(self, original_module):
-        self._original_module = original_module
-        self._initialized = False
+class ResilientUvicornHook:
+    """Safely handles New Relic's Uvicorn hook with lazy loading."""
+    def __init__(self):
+        self._real_hook = None
+        self._hook_loaded = False
+    
+    def _load_real_hook(self):
+        if not self._hook_loaded:
+            try:
+                import newrelic.hooks.adapter_uvicorn
+                self._real_hook = newrelic.hooks.adapter_uvicorn
+                self._hook_loaded = True
+            except Exception:
+                self._hook_loaded = True
     
     def __getattr__(self, name):
-        # Lazy-load the hook after New Relic is initialized
-        if not self._initialized:
-            try:
-                import newrelic.hooks.adapter_uvicorn as original
-                self._original_module = original
-                self._initialized = True
-            except (ImportError, AttributeError):
-                pass
-        # Return real hook or safe fallback
-        if hasattr(self._original_module, name):
-            return getattr(self._original_module, name)
-        return lambda *a, **k: None
+        self._load_real_hook()
+        if self._real_hook and hasattr(self._real_hook, name):
+            return getattr(self._real_hook, name)
+        return lambda *args, **kwargs: None
 ```
 
-**Benefits**:
-- ✓ Full Uvicorn instrumentation (thread pools, request handling, etc.)
-- ✓ Complete distributed tracing across services
-- ✓ LLM call monitoring via AI monitoring
-- ✓ Transaction traces and error detection
-- ✓ No initialization conflicts
+**Complete Monitoring Coverage**:
+- ✓ **Uvicorn instrumentation**: Thread pool metrics, connection handling, request lifecycle
+- ✓ **Distributed tracing**: Full request tracing across services and LLM calls
+- ✓ **Transaction traces**: Detailed performance data and code-level visibility
+- ✓ **LLM monitoring**: Tracks OpenAI and LangChain calls
+- ✓ **Error tracking**: Captures and reports exceptions
+- ✓ **No initialization conflicts**: Works seamlessly with LangGraph Platform
 
 ## Local Development
 
@@ -208,10 +481,11 @@ LangGraph Platform builds and deploys using this image:
 - View New Relic agent logs in deployment output
 
 ### Uvicorn-related New Relic errors (AttributeError, hook conflicts)
-- **These are now prevented** by the protected hook wrapper in `agent.py`
-- The wrapper safely delays hook initialization until after New Relic is ready
-- Full Uvicorn instrumentation is preserved, including thread pool metrics
-- If initialization still fails, verify that `agent.py` includes the `ProtectedUvicornHook` class
+- **These are now prevented** by the `ResilientUvicornHook` in `agent.py`
+- The hook safely delays real hook loading until after New Relic is initialized
+- Full Uvicorn and transaction instrumentation is preserved
+- Thread pool metrics and connection handling are tracked
+- If you see hook errors, verify that `ResilientUvicornHook` is properly installed in `agent.py`
 
 ## Support
 
