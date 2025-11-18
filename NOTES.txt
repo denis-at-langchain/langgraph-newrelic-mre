@@ -1,0 +1,58 @@
+newrelic
+eu01xx5c017d1a20cc293bdc2140aa22FFFFNRAL
+
+
+...
+license_key = eu01xx5c017d1a20cc293bdc2140aa22FFFFNRAL
+...
+app_name = langgraph-newrelic-mre
+...
+
+FROM python:3.9.14-alpine3.16
+
+RUN pip install --no-cache-dir newrelic
+
+ENTRYPOINT ["newrelic-admin", "run-program"]
+
+
+docker build -t python_newrelic:latest .
+
+
+FROM python_newrelic:latest
+
+RUN apk add --no-cache bzip2-dev \
+        coreutils \
+        gcc \
+        libc-dev \
+        libffi-dev \
+        libressl-dev \
+        linux-headers
+
+WORKDIR INSERT_THE_PATH_TO_YOUR_PYTHON_APP
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+
+CMD ["python3", "app.py"]
+
+
+docker build -t my_python_api .
+
+docker run \
+-e NEW_RELIC_LICENSE_KEY=eu01xx5c017d1a20cc293bdc2140aa22FFFFNRAL \
+-e NEW_RELIC_APP_NAME="langgraph-newrelic-mre" \
+-p 8000:8000 -it --rm --name CONTAINER-NAME my_python_api:latest
+
+
+
+
+I updated my browser today (Arc) (unsure if this for all chromium-based browsers, will cause langgraph dev to be rejected with a CORS error).
+Path for me to resolve (temporary)
+go to chrome://flags/#local-network-access-check
+disable local network access check
+
+open -na "Google Chrome" --args --disable-web-security --user-data-dir="/tmp/chrome_dev"
