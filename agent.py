@@ -12,6 +12,13 @@ import os
 import sys
 import asyncio
 
+# Conditionally import New Relic for instrumentation
+try:
+    import newrelic.agent
+    NEW_RELIC_AVAILABLE = True
+except ImportError:
+    NEW_RELIC_AVAILABLE = False
+
 # ============================================================================
 # NEW RELIC - Using environment variable configuration only
 # ============================================================================
@@ -45,6 +52,10 @@ def chatbot(state: State):
     Simple chatbot node that echoes back messages.
     In a real scenario, this would call an LLM.
     """
+    # Set transaction name for New Relic
+    if NEW_RELIC_AVAILABLE:
+        newrelic.agent.set_transaction_name('LangGraph/agent/invoke')
+    
     messages = state["messages"]
     
     # Use ChatOpenAI if available, otherwise echo
