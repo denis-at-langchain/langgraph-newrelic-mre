@@ -132,70 +132,59 @@ async def compile_graph():
         return graph_builder.compile()
     return await asyncio.to_thread(_compile)
 
-_base_graph = asyncio.run(compile_graph())
+graph = asyncio.run(compile_graph())
 
 
 # ============================================================================
-# NEW RELIC - Graph Instrumentation Wrapper
+# NEW RELIC - Instrumentation via Function Wrapping
 # ============================================================================
-# Wrap the graph to set transaction names when invoked by LangGraph Platform
+# Use New Relic's wrap_function_wrapper to instrument graph methods without
+# breaking LangGraph Platform's type validation
 
-class InstrumentedGraph:
-    """
-    Wrapper for compiled graph that sets New Relic transaction names.
-    
-    This ensures that when LangGraph Platform invokes the graph (via /runs/stream
-    or other endpoints), New Relic properly names the transaction instead of
-    showing generic framework transactions.
-    """
-    
-    def __init__(self, base_graph):
-        self._graph = base_graph
-    
-    def __getattr__(self, name):
-        """Delegate all other attributes to the underlying graph."""
-        return getattr(self._graph, name)
-    
-    def invoke(self, *args, **kwargs):
-        """Wrap invoke to set New Relic transaction name."""
-        try:
-            import newrelic.agent
-            newrelic.agent.set_transaction_name('LangGraph/agent/invoke', group='Function')
-        except Exception:
-            pass
-        return self._graph.invoke(*args, **kwargs)
-    
-    async def ainvoke(self, *args, **kwargs):
-        """Wrap ainvoke to set New Relic transaction name."""
-        try:
-            import newrelic.agent
-            newrelic.agent.set_transaction_name('LangGraph/agent/ainvoke', group='Function')
-        except Exception:
-            pass
-        return await self._graph.ainvoke(*args, **kwargs)
-    
-    def stream(self, *args, **kwargs):
-        """Wrap stream to set New Relic transaction name."""
-        try:
-            import newrelic.agent
-            newrelic.agent.set_transaction_name('LangGraph/agent/stream', group='Function')
-        except Exception:
-            pass
-        return self._graph.stream(*args, **kwargs)
-    
-    async def astream(self, *args, **kwargs):
-        """Wrap astream to set New Relic transaction name."""
-        try:
-            import newrelic.agent
-            newrelic.agent.set_transaction_name('LangGraph/agent/astream', group='Function')
-        except Exception:
-            pass
-        return self._graph.astream(*args, **kwargs)
-
-
-graph = InstrumentedGraph(_base_graph)
-
-print("✅ LangGraph compiled successfully with New Relic instrumentation")
+if license_key:
+    try:
+        import newrelic.agent
+        
+        # Store original methods
+        original_invoke = graph.invoke if hasattr(graph, 'invoke') else None
+        original_ainvoke = graph.ainvoke if hasattr(graph, 'ainvoke') else None
+        original_stream = graph.stream if hasattr(graph, 'stream') else None
+        original_astream = graph.astream if hasattr(graph, 'astream') else None
+        
+        # Wrap invoke
+        if original_invoke:
+            def wrapped_invoke(*args, **kwargs):
+                newrelic.agent.set_transaction_name('LangGraph/agent/invoke', group='Function')
+                return original_invoke(*args, **kwargs)
+            graph.invoke = wrapped_invoke
+        
+        # Wrap ainvoke
+        if original_ainvoke:
+            async def wrapped_ainvoke(*args, **kwargs):
+                newrelic.agent.set_transaction_name('LangGraph/agent/ainvoke', group='Function')
+                return await original_ainvoke(*args, **kwargs)
+            graph.ainvoke = wrapped_ainvoke
+        
+        # Wrap stream
+        if original_stream:
+            def wrapped_stream(*args, **kwargs):
+                newrelic.agent.set_transaction_name('LangGraph/agent/stream', group='Function')
+                return original_stream(*args, **kwargs)
+            graph.stream = wrapped_stream
+        
+        # Wrap astream
+        if original_astream:
+            async def wrapped_astream(*args, **kwargs):
+                newrelic.agent.set_transaction_name('LangGraph/agent/astream', group='Function')
+                return original_astream(*args, **kwargs)
+            graph.astream = wrapped_astream
+        
+        print("✅ LangGraph compiled successfully with New Relic instrumentation")
+    except Exception as e:
+        print(f"⚠️ New Relic instrumentation failed: {e}")
+        print("✅ LangGraph compiled successfully (without New Relic instrumentation)")
+else:
+    print("✅ LangGraph compiled successfully")
 print("=" * 80)
 print("🚀 Ready to deploy!")
 print("=" * 80)
