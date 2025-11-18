@@ -53,3 +53,5 @@ secrets/
 services/
 pip_freeze_output.txt
 .langgraph_api
+
+NOTES.txt
