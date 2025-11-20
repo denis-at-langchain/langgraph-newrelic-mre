@@ -89,6 +89,7 @@ from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
 
 
 class State(TypedDict):
@@ -96,17 +97,43 @@ class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 
+@tool
+def get_weather(location: str) -> str:
+    """Get the current weather for a location.
+    
+    Args:
+        location: The city or location to get weather for
+        
+    Returns:
+        Weather description string
+    """
+    # Instrument with New Relic function trace
+    if license_key:
+        try:
+            import newrelic.agent
+            # Use function_trace for nested visibility within the transaction
+            with newrelic.agent.FunctionTrace(name='get_weather', group='Tool'):
+                result = f"The weather in {location} is sunny and 72°F"
+                return result
+        except Exception:
+            pass
+    
+    # Fallback without instrumentation
+    return f"The weather in {location} is sunny and 72°F"
+
+
 def chatbot(state: State):
     """
-    Simple chatbot node that echoes back messages.
-    In a real scenario, this would call an LLM.
+    Simple chatbot node that can call tools.
+    In a real scenario, this would call an LLM with tool support.
     """
     messages = state["messages"]
     
-    # Use ChatOpenAI if available, otherwise echo
+    # Use ChatOpenAI if available, with tool binding
     try:
         llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
-        response = llm.invoke(messages)
+        llm_with_tools = llm.bind_tools([get_weather])
+        response = llm_with_tools.invoke(messages)
         return {"messages": [response]}
     except Exception as e:
         print(f"⚠️ LLM not available, using echo mode: {e}")
