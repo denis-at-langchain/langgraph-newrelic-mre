@@ -97,6 +97,20 @@ class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 
+def _get_weather_impl(location: str) -> str:
+    """Internal implementation of weather lookup."""
+    print(f"🌤️ Tool called: get_weather(location='{location}')")
+    result = f"The weather in {location} is sunny and 72°F"
+    print(f"🌤️ Tool result: {result}")
+    return result
+
+# Apply New Relic instrumentation if available
+try:
+    import newrelic.agent
+    _get_weather_impl = newrelic.agent.function_trace(name='get_weather', group='Tool')(_get_weather_impl)
+except Exception:
+    pass
+
 @tool
 def get_weather(location: str) -> str:
     """Get the current weather for a location.
@@ -107,19 +121,7 @@ def get_weather(location: str) -> str:
     Returns:
         Weather description string
     """
-    # Instrument with New Relic function trace
-    if license_key:
-        try:
-            import newrelic.agent
-            # Use function_trace for nested visibility within the transaction
-            with newrelic.agent.FunctionTrace(name='get_weather', group='Tool'):
-                result = f"The weather in {location} is sunny and 72°F"
-                return result
-        except Exception:
-            pass
-    
-    # Fallback without instrumentation
-    return f"The weather in {location} is sunny and 72°F"
+    return _get_weather_impl(location)
 
 
 def chatbot(state: State):
